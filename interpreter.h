@@ -1,6 +1,7 @@
 #ifndef INTERPRETER_H
 #define INTERPRETER_H
 #include <stddef.h>
+#define DEBUG
 
 #define ADD_TOKEN(lexer,t,off,s) \
 	if(lexer.size >= lexer.capacity){\
@@ -17,6 +18,8 @@ enum Error {
 	ERROR_UNKNOWN,
 	ERROR_WRONG_ARGS,
 	ERROR_EXTRA,
+	ERROR_DNE,
+	ERROR_WRONG_TYPE,
 };
 
 enum TokenType {
@@ -31,8 +34,9 @@ enum TokenType {
 	IF, ELSE, // 25
 	AND, OR, NOT, // 28
 	EXIT, END, // 30
+	FUNC, CALL, // 32
 	// MISC
-	NEWLINE, // 31
+	NEWLINE, // 33
 };
 
 typedef struct {
@@ -100,10 +104,20 @@ typedef struct Expr_Fun_Call {
 } Expr_Fun_Call;
 
 typedef struct {
+	size_t offset;
+	size_t size;
+	Expr* exprs;
+	size_t argc;
+	Token* args; // just the identifiers with the names
+} Function;
+
+typedef struct {
 	Expr* expressions;
 	size_t size;
 	size_t capacity;
 	int exit;
+	Function* functions;
+	size_t function_count;
 } Parser;
 
 typedef struct {

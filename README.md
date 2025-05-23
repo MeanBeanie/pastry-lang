@@ -22,9 +22,9 @@ a simple programming language, non static types and no curly braces
 
 1. make macros/constants that let you add color/styling to print using ansi escape
 1. command line input, (pass argv from main.c to the function after taking what i want)
-1. include other files
+1. ~~include other files~~
     1. make a standard library style includable thing
-    1. no headers, just include src(nothing can go wrong b/c if i don't look at ODR it might not hurt me)
+    1. no header guards, just include src(nothing can go wrong b/c if i don't look at ODR it might not hurt me)
 1. confirmation to interpret if the file path doesn't have a .pastry in it
 1. line tracking for errors(not relevant if you just don't make mistakes)
 

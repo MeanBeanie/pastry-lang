@@ -18,6 +18,8 @@ enum TokenType identifier(char* str){
 	IS_RESERVED(str, "not", NOT);
 	IS_RESERVED(str, "exit", EXIT);
 	IS_RESERVED(str, "end", END);
+	IS_RESERVED(str, "func", FUNC);
+	IS_RESERVED(str, "call", CALL);
 	return IDENTIFIER;
 }
 
@@ -73,6 +75,57 @@ void print_expression(char* src, const char* prepend, Expr expr){
 			break;
 		}
 	}
+}
+
+char* preprocess(char* src, int* size){
+	int og_size = (*size);
+	char* res = NULL;
+	res = realloc(res, strlen(src)+1);
+	strncpy(res, src, (*size));
+	res[(*size)] = '\0';
+	int instruction = 0;
+	int instruction_size = 0;
+	for(int i = 0; i < og_size; i++){
+		if(instruction == 1){
+			if(src[i] == '\n'){
+				char filepath[instruction_size+1];
+				strncpy(filepath, src+i-instruction_size, instruction_size);
+				filepath[instruction_size] = '\0';
+
+				FILE* file = fopen(filepath, "r");
+				if(file == NULL){
+					fprintf(stderr, "preprocess: Cannot find file at path \"%s\"\n", filepath);
+					return NULL;
+				}
+				fseek(file, 0, SEEK_END);
+				int f_size = ftell(file);
+				fseek(file, 0, SEEK_SET);
+				char buffer[f_size+1];
+				fread(buffer, sizeof(char), f_size, file);
+				buffer[f_size] = '\0';
+
+				char* temp = malloc(strlen(res)+strlen(buffer)+1);
+				for(int j = 0; j < (*size); j++){
+					temp[j+strlen(buffer)] = res[j];
+				}
+				*size = strlen(res) + strlen(buffer);
+				strncpy(temp, buffer, strlen(buffer));
+				temp[(*size)] = '\0';
+				free(res);
+				res = temp;
+
+				instruction_size = 0;
+				instruction = 0;
+			}
+			else{
+				instruction_size++;
+			}
+		}
+		if(src[i] == '!'){
+			instruction = 1;
+		}
+	}
+	return res;
 }
 
 Lexer lex(char* src, int size){
@@ -138,6 +191,11 @@ Lexer lex(char* src, int size){
 			case '\t':
 			case '\r':
 			{
+				break;
+			}
+			case '!':
+			{
+				inSomething = 1;
 				break;
 			}
 			case '(': ADD_TOKEN(res, OPEN_PAREN, i, 1); break;
@@ -222,6 +280,8 @@ Parser parse(Lexer lexer){
 		.capacity = 8,
 		.expressions = malloc(8*sizeof(Expr)),
 		.exit = ERROR_NONE,
+		.function_count = 0,
+		.functions = malloc(8*sizeof(Function)),
 	};
 
 	int line = 1;
@@ -229,10 +289,11 @@ Parser parse(Lexer lexer){
 	int savingRHS = 0;
 	int savingVar = 0;
 	int savingVarReassign = 0;
-	int inFunction = 0;
+	int inFunctionCall = 0;
+	int inFunctionBody = 0;
 	for(int i = 0; i < (int)lexer.size; i++){
 		Token token = lexer.tokens[i];
-		if(inFunction == 1 && token.type != NEWLINE && (token.type > NUMBER || token.type < IDENTIFIER)){
+		if(inFunctionCall == 1 && token.type != NEWLINE && (token.type > NUMBER || token.type < IDENTIFIER)){
 			fprintf(stderr, "Cannot have anything but a variable or a literal in a function arg\n");
 			res.exit = ERROR_WRONG_ARGS;
 			continue;
@@ -240,8 +301,8 @@ Parser parse(Lexer lexer){
 		switch(token.type){
 			case NEWLINE:
 			{
-				if(inFunction == 1){
-					inFunction = 0;
+				if(inFunctionCall == 1){
+					inFunctionCall = 0;
 				}
 				line++;
 				break;
@@ -258,7 +319,7 @@ Parser parse(Lexer lexer){
 					res.expressions[res.size-1].as.var_set->value.as.literal = &lexer.tokens[i];
 					savingVar = 0;
 				}
-				else if(inFunction == 1){	
+				else if(inFunctionCall == 1){	
 					Expr expr = {0};
 					expr.type = VAR_REF;
 					expr.as.literal = &lexer.tokens[i];
@@ -267,7 +328,7 @@ Parser parse(Lexer lexer){
 					if(res.expressions[res.size-1].as.fun_call->argc >= 16){
 						fprintf(stderr, "Too many args in function\n");
 						res.exit = ERROR_WRONG_ARGS;
-						inFunction = 0;
+						inFunctionCall = 0;
 					}
 				}
 				else if(i+1 < (int)lexer.size && lexer.tokens[i+1].type == EQ){
@@ -450,7 +511,7 @@ Parser parse(Lexer lexer){
 			}
 			default:
 			{
-				if(inFunction == 1 && (token.type == NUMBER || token.type == STRING)){
+				if(inFunctionCall == 1 && (token.type == NUMBER || token.type == STRING)){
 					Expr expr = {0};
 					expr.type = LITERAL;
 					expr.as.literal = &lexer.tokens[i];
@@ -459,10 +520,27 @@ Parser parse(Lexer lexer){
 					if(res.expressions[res.size-1].as.fun_call->argc >= 16){
 						fprintf(stderr, "Too many args in function\n");
 						res.exit = ERROR_WRONG_ARGS;
-						inFunction = 0;
+						inFunctionCall = 0;
 					}
 				}
-				if(token.type >= VAR && token.type <= END){
+				if(token.type >= VAR && token.type <= CALL){
+					if(inFunctionBody == 1 && token.type == END){
+						inFunctionBody = 0;
+						break;
+					}
+					if(token.type == FUNC){
+						inFunctionBody = 1;
+						if(i+1 >= (int)lexer.size || lexer.tokens[i+1].type != IDENTIFIER){
+							fprintf(stderr, "Function declaration requires name afterwards\n");
+							res.exit = ERROR_WRONG_ARGS;
+							inFunctionBody = 0;
+							break;
+						}
+						res.functions[res.function_count].offset = lexer.tokens[i+1].offset;
+						res.functions[res.function_count].size = lexer.tokens[i+1].size;
+
+						break;
+					}
 					// FUNCALL
 					if(res.size >= res.capacity){
 						res.capacity *= 2;
@@ -474,7 +552,7 @@ Parser parse(Lexer lexer){
 					res.expressions[res.size].as.fun_call->argc = 0;
 					res.expressions[res.size].as.fun_call->args = malloc(16*sizeof(Expr));
 					res.size++;
-					inFunction = 1;
+					inFunctionCall = 1;
 				}
 				break;
 			}
@@ -778,13 +856,15 @@ start_switch_get_var_assignment:
 	return var;
 }
 	
-int eval_expressions(char* src, Parser parser){
+int eval_expressions(char* src, Expr* expressions, int size){
+	int exit_code = 0;
+
 	Var* vars = malloc(8*sizeof(Var));
 	int var_count = 0;
 	int var_capacity = 8;
 	int loop_start = -1;
-	for(int i = 0; i < (int)parser.size; i++){
-		Expr expr = parser.expressions[i];
+	for(int i = 0; i < size; i++){
+		Expr expr = expressions[i];
 start_switch_expr:
 		switch(expr.type){
 			case GROUP:
@@ -820,6 +900,7 @@ start_switch_expr:
 				}
 				if(found_index < 0){
 					fprintf(stderr, "VAR_REASSIGN: Failed to find variable \"%.*s\"\n", (int)expr.as.literal->size, search_name);
+					exit_code = ERROR_DNE;
 					goto finish_eval;
 				}
 				
@@ -830,22 +911,29 @@ start_switch_expr:
 			case FUN_CALL:
 			{
 				switch(expr.as.fun_call->name.type){
+					case CALL:
+					{
+						// TODO loop through and find function to call
+						break;
+					}
 					case EXIT:
 					{
 						if(expr.as.fun_call->argc > 0
 						&& expr.as.fun_call->args[0].type == LITERAL
 						&& expr.as.fun_call->args[0].as.literal->type == NUMBER){
-							return stoi(src+expr.as.fun_call->args[0].as.literal->offset, expr.as.fun_call->args[0].as.literal->size);
+							exit_code = stoi(src+expr.as.fun_call->args[0].as.literal->offset, expr.as.fun_call->args[0].as.literal->size);
 						}
 						else{
-							return 1;
+							exit_code = 1;
 						}
+						goto finish_eval;
 						break;
 					}
 					case FOR:
 					{
 						if(expr.as.fun_call->argc < 2){
 							fprintf(stderr, "Incorrect number of args for for loop\n");
+							exit_code = ERROR_WRONG_ARGS;
 							goto finish_eval;
 						}
 						loop_start = i;
@@ -855,11 +943,12 @@ start_switch_expr:
 					{
 						if(loop_start < 0){
 							fprintf(stderr, "Stray \"end\" call made\n");
+							exit_code = ERROR_EXTRA;
 							goto finish_eval;
 						}
 						int found_index = -1;
-						char search_name[parser.expressions[loop_start].as.fun_call->args[0].as.literal->size];
-						strncpy(search_name, src+parser.expressions[loop_start].as.fun_call->args[0].as.literal->offset, parser.expressions[loop_start].as.fun_call->args[0].as.literal->size);
+						char search_name[expressions[loop_start].as.fun_call->args[0].as.literal->size];
+						strncpy(search_name, src+expressions[loop_start].as.fun_call->args[0].as.literal->offset, expressions[loop_start].as.fun_call->args[0].as.literal->size);
 						for(int j = 0; j < var_count; j++){
 							char cmp_name[vars[j].n_size];
 							strncpy(cmp_name, src+vars[j].n_offset, vars[j].n_size);
@@ -869,23 +958,27 @@ start_switch_expr:
 							}
 						}
 						if(found_index < 0){
-							fprintf(stderr, "END: Failed to find variable \"%.*s\"\n", (int)parser.expressions[loop_start].as.fun_call->args[0].as.literal->size, search_name);
+							fprintf(stderr, "END: Failed to find variable \"%.*s\"\n", (int)expressions[loop_start].as.fun_call->args[0].as.literal->size, search_name);
+							exit_code = ERROR_DNE;
 							goto finish_eval;
 						}
 
 						if(vars[found_index].type != NUMBER){
 							fprintf(stderr, "For loop requires variable to be integer not string\n");
+							exit_code = ERROR_WRONG_TYPE;
 							goto finish_eval;
 						}
-						if(parser.expressions[loop_start].as.fun_call->args[1].type != LITERAL){
+						if(expressions[loop_start].as.fun_call->args[1].type != LITERAL){
 							fprintf(stderr, "Need upper bound for loop\n");
+							exit_code = ERROR_WRONG_ARGS;
 							goto finish_eval;
 						}
-						if(parser.expressions[loop_start].as.fun_call->args[1].as.literal->type != NUMBER){
+						if(expressions[loop_start].as.fun_call->args[1].as.literal->type != NUMBER){
 							fprintf(stderr, "For loop upper bound needs to be integer\n");
+							exit_code = ERROR_WRONG_TYPE;
 							goto finish_eval;
 						}
-						if(vars[found_index].integer < stoi(src+parser.expressions[loop_start].as.fun_call->args[1].as.literal->offset, parser.expressions[loop_start].as.fun_call->args[1].as.literal->size)){
+						if(vars[found_index].integer < stoi(src+expressions[loop_start].as.fun_call->args[1].as.literal->offset, expressions[loop_start].as.fun_call->args[1].as.literal->size)){
 							i = loop_start;
 							vars[found_index].integer++;
 						}
@@ -919,6 +1012,7 @@ start_switch_expr:
 									}
 									if(found_index < 0){
 										fprintf(stderr, "PRINT_VAR_REF: Failed to find variable \"%.*s\"\n", (int)expr.as.fun_call->args[i].as.literal->size, search_name);
+										exit_code = ERROR_DNE;
 										goto finish_eval;
 									}
 									if(vars[found_index].type == STRING){
@@ -943,6 +1037,7 @@ start_switch_expr:
 					default:
 					{
 						fprintf(stderr, "Function %i not implemented yet\n", expr.as.fun_call->name.type);
+						exit_code = ERROR_UNKNOWN;
 						goto finish_eval;
 						break;
 					}
@@ -952,7 +1047,7 @@ start_switch_expr:
 			default:
 			{
 				fprintf(stderr, "Unimplemented expression type: %i\n", expr.type);
-				i = (int)parser.size;
+				i = size;
 				break;
 			}
 		}
@@ -962,10 +1057,16 @@ finish_eval:
 	free(vars);
 	vars = NULL;
 
-	return 0;
+	return exit_code;
 }
 
 int run_code(char* src, int size){
+	src = preprocess(src, &size);
+	if(src == NULL){
+		fprintf(stderr, "run_code: Failed to preprocess src\n");
+		return 1;
+	}
+
 	Lexer lexer = lex(src, size);
 	Parser parser = {0};
 
@@ -999,10 +1100,7 @@ int run_code(char* src, int size){
 	printf("--RUNNING CODE TIME--\n");
 #endif
 
-	int exit_code = eval_expressions(src, parser);
-	if(exit_code != 0){
-		exit(exit_code);
-	}
+	int exit_code = eval_expressions(src, parser.expressions, (int)parser.size);
 
 end:
 	if(parser.expressions != NULL){
@@ -1039,5 +1137,6 @@ end:
 	}
 	free(lexer.tokens);
 	lexer.tokens = NULL;
-	return 0;
+	free(src);
+	return exit_code;
 }

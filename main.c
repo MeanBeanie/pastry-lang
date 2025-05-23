@@ -10,8 +10,9 @@ int main(int argc, char** argv){
 		fseek(file, 0, SEEK_END);
 		int size = ftell(file);
 		fseek(file, 0, SEEK_SET);
-		char buffer[size];
+		char buffer[size+1];
 		fread(buffer, sizeof(char), size, file);
+		buffer[size] = '\0';
 		return run_code(buffer, size);
 	}
 	else{
