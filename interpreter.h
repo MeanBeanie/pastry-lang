@@ -1,7 +1,6 @@
 #ifndef INTERPRETER_H
 #define INTERPRETER_H
 #include <stddef.h>
-#define DEBUG
 
 #define ADD_TOKEN(lexer,t,off,s) \
 	if(lexer.size >= lexer.capacity){\
@@ -104,9 +103,11 @@ typedef struct Expr_Fun_Call {
 } Expr_Fun_Call;
 
 typedef struct {
-	size_t offset;
-	size_t size;
+	size_t name_offset;
+	size_t name_size;
 	Expr* exprs;
+	size_t expr_count;
+	size_t expr_capacity;
 	size_t argc;
 	Token* args; // just the identifiers with the names
 } Function;

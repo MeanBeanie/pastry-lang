@@ -1,0 +1,23 @@
+func new_print x y z
+	print "NEW_PRINT: " x ", " y ", " z
+	print "NEW_PRINT: " x ", " y ", " z
+	print "NEW_PRINT: " x ", " y ", " z
+	print "NEW_PRINT: " x ", " y ", " z
+	print "NEW_PRINT: " x ", " y ", " z
+	print "NEW_PRINT: " x ", " y ", " z
+	z = 10
+	print "NEW_PRINT: " x ", " y ", " z
+end
+
+var a = 34
+var b = 70
+var c = 30
+
+call new_print 10 20 30
+
+print "PRINT: " a ", " b ", " c
+
+c = 10000
+
+call new_print a b c
+print "PRINT: " a ", " b ", " c

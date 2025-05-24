@@ -14,9 +14,10 @@ a simple programming language, non static types and no curly braces
 1. implement while loops
 1. implement if and else(maybe elif at some point)
 1. add bash integration to make it actually useful
-1. functions!!
+1. ~~functions!!~~
 1. temp variables(get deleted after scope)
     1. requires me to track scope
+    1. NOTE!! technically functions have their own scope from the way they're handled
 
 ### fun other stuff todo
 
