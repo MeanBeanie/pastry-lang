@@ -1,0 +1,18 @@
+func hello h
+	print "Hello: " h
+end
+
+func hi param1
+	print "Hi: " param1
+end
+
+var y 100
+var x "Hello, World!"
+
+print y
+print x
+
+var y y*(600/y)
+
+call hello x
+call hi y

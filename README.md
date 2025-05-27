@@ -9,7 +9,7 @@ a simple programming language, non static types and no curly braces
 
 ### todo
 
-1. implement read function(user input)
+1. ~~implement read function(user input)~~ see user error message
 1. make for loops support step size(and negative step size)
 1. implement while loops
 1. implement if and else(maybe elif at some point)
@@ -17,15 +17,17 @@ a simple programming language, non static types and no curly braces
 1. ~~functions!!~~
 1. temp variables(get deleted after scope)
     1. requires me to track scope
-    1. NOTE!! technically functions have their own scope from the way they're handled
+    1. **NOTE** technically functions have their own scope from the way they're handled
 
 ### fun other stuff todo
 
-1. make macros/constants that let you add color/styling to print using ansi escape
+1. ~~make macros/constants that let you add color/styling to print using ansi escape~~
+    1. not completed, but pushing this into the standard library style thing
 1. command line input, (pass argv from main.c to the function after taking what i want)
 1. ~~include other files~~
-    1. make a standard library style includable thing
     1. no header guards, just include src(nothing can go wrong b/c if i don't look at ODR it might not hurt me)
+1. make a standard library style includable thing
+    1. general rule, use `__std` before every var name to ensure no redefines
 1. confirmation to interpret if the file path doesn't have a .pastry in it
 1. line tracking for errors(not relevant if you just don't make mistakes)
 
